@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +43,7 @@ fun MediaPlayerScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val currentArtist by viewModel.currentArtist.collectAsState()
+    val albumCoverUrl by viewModel.albumCoverUrl.collectAsState()
     
     // Continuous rotation animation for the disc
     val rotation by animateFloatAsState(
@@ -92,22 +96,25 @@ fun MediaPlayerScreen(
             
             // Center Section - Album Art and Controls
             CenterSection(
-                currentStation = currentStation,
-                currentSong = currentSong,
-                currentArtist = currentArtist,
-                isPlaying = isPlaying,
-                isLoading = isLoading,
-                rotation = rotation,
-                pulseAlpha = pulseAlpha,
-                onPlayPause = {
-                    if (isPlaying) {
-                        viewModel.pauseRadio()
-                    } else {
-                        viewModel.resumeRadio()
-                    }
-                },
-                onStop = { viewModel.stopRadio() }
-            )
+            currentStation = currentStation,
+            currentSong = currentSong,
+            currentArtist = currentArtist,
+            albumCoverUrl = albumCoverUrl,
+            isPlaying = isPlaying,
+            isLoading = isLoading,
+            rotation = rotation,
+            pulseAlpha = pulseAlpha,
+            onPlayPause = {
+                if (isPlaying) {
+                    viewModel.pauseRadio()
+                } else {
+                    viewModel.resumeRadio()
+                }
+            },
+            onStop = {
+                viewModel.stopRadio()
+            }
+        )
             
             // Bottom Section - Additional Controls
             BottomSection(
@@ -202,6 +209,7 @@ fun CenterSection(
     currentStation: RadioStation?,
     currentSong: String,
     currentArtist: String,
+    albumCoverUrl: String?,
     isPlaying: Boolean,
     isLoading: Boolean,
     rotation: Float,
@@ -233,20 +241,11 @@ fun CenterSection(
                     )
             )
             
-            // Main disc
+            // Main disc with album cover
             Box(
                 modifier = Modifier
                     .size(260.dp)
                     .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                            )
-                        )
-                    )
                     .border(
                         width = 4.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
@@ -255,12 +254,57 @@ fun CenterSection(
                     .rotate(if (isPlaying) rotation else 0f),
                 contentAlignment = Alignment.Center
             ) {
-                // Inner circle
+                // Album cover or default background
+                if (albumCoverUrl != null && albumCoverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = albumCoverUrl,
+                        contentDescription = "Album Cover",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        fallback = null
+                    )
+                    
+                    // Overlay for vinyl effect
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.1f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    // Default gradient background when no album cover
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                    )
+                                )
+                            )
+                    )
+                }
+                
+                // Inner circle (vinyl center)
                 Box(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface),
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -271,18 +315,20 @@ fun CenterSection(
                     )
                 }
                 
-                // Vinyl lines
-                repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(180.dp - (index * 25).dp)
-                            .clip(CircleShape)
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = CircleShape
-                            )
-                    )
+                // Vinyl lines (only show when there's an album cover)
+                if (albumCoverUrl != null && albumCoverUrl.isNotBlank()) {
+                    repeat(3) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(160.dp - (index * 30).dp)
+                                .clip(CircleShape)
+                                .border(
+                                    width = 1.dp,
+                                    color = Color.White.copy(alpha = 0.3f),
+                                    shape = CircleShape
+                                )
+                        )
+                    }
                 }
             }
         }
@@ -293,7 +339,8 @@ fun CenterSection(
         SongInfoSection(
             currentSong = currentSong,
             currentArtist = currentArtist,
-            currentStation = currentStation
+            currentStation = currentStation,
+            albumCoverUrl = albumCoverUrl
         )
         
         Spacer(modifier = Modifier.height(40.dp))
@@ -312,7 +359,8 @@ fun CenterSection(
 fun SongInfoSection(
     currentSong: String,
     currentArtist: String,
-    currentStation: RadioStation?
+    currentStation: RadioStation?,
+    albumCoverUrl: String? = null
 ) {
     Card(
         modifier = Modifier

@@ -8,6 +8,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.Metadata
+import androidx.media3.extractor.metadata.icy.IcyHeaders
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,8 +58,46 @@ class RadioPlayerService : Service() {
                     val title = mediaMetadata.title?.toString() ?: ""
                     val artist = mediaMetadata.artist?.toString() ?: ""
                     
+                    // Debug logging to check if metadata is available
+                    android.util.Log.d("RadioPlayerService", "Metadata changed - Title: '$title', Artist: '$artist'")
+                    android.util.Log.d("RadioPlayerService", "Full metadata: $mediaMetadata")
+                    
                     _currentSong.value = title
                     _currentArtist.value = artist
+                }
+                
+                override fun onMetadata(metadata: Metadata) {
+                    super.onMetadata(metadata)
+                    
+                    for (i in 0 until metadata.length()) {
+                        val entry = metadata.get(i)
+                        android.util.Log.d("RadioPlayerService", "ICY Metadata entry: $entry")
+                        
+                        when (entry) {
+                            is IcyInfo -> {
+                                val icyTitle = entry.title ?: ""
+                                android.util.Log.d("RadioPlayerService", "ICY Info - Title: '$icyTitle'")
+                                
+                                // Parse ICY title which usually contains "Artist - Song"
+                                if (icyTitle.contains(" - ")) {
+                                    val parts = icyTitle.split(" - ", limit = 2)
+                                    if (parts.size == 2) {
+                                        _currentArtist.value = parts[0].trim()
+                                        _currentSong.value = parts[1].trim()
+                                        android.util.Log.d("RadioPlayerService", "Parsed ICY - Artist: '${parts[0].trim()}', Song: '${parts[1].trim()}'")
+                                    }
+                                } else if (icyTitle.isNotEmpty()) {
+                                    // If no separator, treat as song title
+                                    _currentSong.value = icyTitle
+                                    _currentArtist.value = ""
+                                    android.util.Log.d("RadioPlayerService", "ICY title without separator: '$icyTitle'")
+                                }
+                            }
+                            is IcyHeaders -> {
+                                android.util.Log.d("RadioPlayerService", "ICY Headers - Name: ${entry.name}, Genre: ${entry.genre}, Bitrate: ${entry.bitrate}")
+                            }
+                        }
+                    }
                 }
             })
         }

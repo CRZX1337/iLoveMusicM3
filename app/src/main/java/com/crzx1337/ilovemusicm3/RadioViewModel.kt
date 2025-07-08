@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 data class RadioStation(
     val name: String,
@@ -40,6 +42,12 @@ class RadioViewModel : ViewModel() {
     
     private val _currentArtist = MutableStateFlow("")
     val currentArtist: StateFlow<String> = _currentArtist.asStateFlow()
+    
+    private val _albumCoverUrl = MutableStateFlow<String?>(null)
+    val albumCoverUrl: StateFlow<String?> = _albumCoverUrl.asStateFlow()
+    
+    private val albumCoverRepository = AlbumCoverRepository()
+    private var albumCoverJob: Job? = null
     
     // Available radio stations
     val radioStations = listOf(
@@ -122,12 +130,14 @@ class RadioViewModel : ViewModel() {
             viewModelScope.launch {
                 radioService?.currentSong?.collect {
                     _currentSong.value = it
+                    fetchAlbumCover(it, _currentArtist.value)
                 }
             }
             
             viewModelScope.launch {
                 radioService?.currentArtist?.collect {
                     _currentArtist.value = it
+                    fetchAlbumCover(_currentSong.value, it)
                 }
             }
         }
@@ -175,6 +185,29 @@ class RadioViewModel : ViewModel() {
     
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    private fun fetchAlbumCover(song: String, artist: String) {
+        // Cancel previous job
+        albumCoverJob?.cancel()
+        
+        if (song.isBlank() || artist.isBlank()) {
+            _albumCoverUrl.value = null
+            return
+        }
+        
+        albumCoverJob = viewModelScope.launch {
+            // Add a small delay to avoid too many API calls
+            delay(1000)
+            
+            try {
+                val coverUrl = albumCoverRepository.getAlbumCover(song, artist)
+                _albumCoverUrl.value = coverUrl
+            } catch (e: Exception) {
+                // Silently fail - album cover is not critical
+                _albumCoverUrl.value = null
+            }
+        }
     }
     
     override fun onCleared() {

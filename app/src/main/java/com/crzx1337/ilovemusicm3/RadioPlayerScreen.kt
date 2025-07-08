@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.rounded.*
@@ -49,6 +50,7 @@ fun RadioPlayerScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val currentArtist by viewModel.currentArtist.collectAsState()
+    val albumCoverUrl by viewModel.albumCoverUrl.collectAsState()
     
     // Continuous rotation animation for the disc
     val rotation by animateFloatAsState(
@@ -104,6 +106,7 @@ fun RadioPlayerScreen(
                     currentStation = currentStation,
                     currentSong = currentSong,
                     currentArtist = currentArtist,
+                    albumCoverUrl = albumCoverUrl,
                     isPlaying = isPlaying,
                     isLoading = isLoading,
                     rotation = rotation,
@@ -217,6 +220,7 @@ fun CurrentPlayingSection(
     currentStation: RadioStation?,
     currentSong: String,
     currentArtist: String,
+    albumCoverUrl: String?,
     isPlaying: Boolean,
     isLoading: Boolean,
     rotation: Float,
@@ -278,14 +282,20 @@ fun CurrentPlayingSection(
                         modifier = Modifier
                             .size(180.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            .then(
+                                if (albumCoverUrl != null) {
+                                    Modifier.background(Color.Transparent)
+                                } else {
+                                    Modifier.background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                            )
+                                        )
                                     )
-                                )
+                                }
                             )
                             .border(
                                 width = 3.dp,
@@ -295,6 +305,18 @@ fun CurrentPlayingSection(
                             .rotate(if (isPlaying) rotation else 0f),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Album cover or default background
+                        if (albumCoverUrl != null) {
+                            AsyncImage(
+                                model = albumCoverUrl,
+                                contentDescription = "Album Cover",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        
                         // Inner circle
                         Box(
                             modifier = Modifier
@@ -311,18 +333,20 @@ fun CurrentPlayingSection(
                             )
                         }
                         
-                        // Vinyl lines
-                        repeat(3) { index ->
-                            Box(
-                                modifier = Modifier
-                                    .size(120.dp - (index * 20).dp)
-                                    .clip(CircleShape)
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color.White.copy(alpha = 0.2f),
-                                        shape = CircleShape
-                                    )
-                            )
+                        // Vinyl lines - only show when album cover is present
+                        if (albumCoverUrl != null) {
+                            repeat(3) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp - (index * 20).dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color.White.copy(alpha = 0.2f),
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
                         }
                     }
                 }
